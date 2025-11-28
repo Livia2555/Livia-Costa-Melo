@@ -4,9 +4,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
 from .models import Usuario, Estoque, Historico
 from .serializers import (
+    LoginSerializer,
     UsuarioSerializer,
     EstoqueSerializer,
     HistoricoSerializer,
@@ -14,17 +16,30 @@ from .serializers import (
 )
 
 
+# ==================== LOGIN VIEW ====================
+
+class LoginView(TokenObtainPairView):
+    """
+    POST /api/login/
+    Body: {"username": "admin", "password": "senha"}
+    Login com superuser do Django
+    """
+    serializer_class = LoginSerializer
+
+
 # ==================== USUARIO VIEWS ====================
 
 class UsuarioListCreateView(ListCreateAPIView):
     """
-    GET /api/usuarios/ - Lista todos os usuários
+    GET /api/usuarios/ - Lista todos os usuários (mais recente primeiro)
     POST /api/usuarios/ - Cria um novo usuário
     """
-    queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Usuario.objects.all().order_by('-id')  # Mais recente primeiro
 
 
 class UsuarioDetailView(RetrieveUpdateDestroyAPIView):
@@ -44,13 +59,15 @@ class UsuarioDetailView(RetrieveUpdateDestroyAPIView):
 
 class EstoqueListCreateView(ListCreateAPIView):
     """
-    GET /api/estoque/ - Lista todos os produtos
+    GET /api/estoque/ - Lista todos os produtos (mais recente primeiro)
     POST /api/estoque/ - Cria um novo produto
     """
-    queryset = Estoque.objects.all()
     serializer_class = EstoqueSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Estoque.objects.all().order_by('-criado_em')  # Mais recente primeiro
 
 
 class EstoqueDetailView(RetrieveUpdateDestroyAPIView):
@@ -67,95 +84,76 @@ class EstoqueDetailView(RetrieveUpdateDestroyAPIView):
 
 
 class EstoqueEntradaView(APIView):
-    """
-    POST /api/estoque/{id}/entrada/
-    Adiciona quantidade ao estoque (ENTRADA)
-    Body: {"quantidade": 10}
-    """
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    
     def post(self, request, pk):
-        produto = get_object_or_404(Estoque, pk=pk)
-        serializer = EntradaSaidaSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            quantidade = serializer.validated_data['quantidade']
-            
-            # Atualiza o estoque
-            produto.quantidade += quantidade
-            produto.save()
-            
-            # Cria registro no histórico
-            # ATENÇÃO: Ajuste conforme seu modelo de autenticação
-            Historico.objects.create(
-                responsavel=request.user.usuario if hasattr(request.user, 'usuario') else Usuario.objects.first(),
-                produto=produto,
-                tipo_operacao='entrada',
-                quantidade=quantidade
-            )
-            
-            return Response({
-                'message': 'Entrada registrada com sucesso',
-                'produto': produto.tipo,
-                'quantidade_adicionada': quantidade,
-                'quantidade_atual': produto.quantidade
-            }, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            estoque = Estoque.objects.get(pk=pk)
+        except Estoque.DoesNotExist:
+            return Response({"erro": "Produto não encontrado"}, status=404)
 
+        quantidade = request.data.get("quantidade")
 
+        if quantidade is None:
+            return Response({"erro": "O campo 'quantidade' é obrigatório"}, status=400)
+
+        try:
+            quantidade = int(quantidade)
+        except:
+            return Response({"erro": "Quantidade inválida"}, status=400)
+
+        if quantidade <= 0:
+            return Response({"erro": "A quantidade deve ser maior que zero"}, status=400)
+
+        # Atualiza a quantidade do estoque
+        estoque.quantidade += quantidade
+        estoque.save()
+
+        return Response({
+            "mensagem": "Entrada registrada com sucesso",
+            "id": estoque.id,
+            "novo_total": estoque.quantidade
+        }, status=200)
 class EstoqueSaidaView(APIView):
-    """
-    POST /api/estoque/{id}/saida/
-    Remove quantidade do estoque (SAÍDA)
-    Body: {"quantidade": 5}
-    """
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    
     def post(self, request, pk):
-        produto = get_object_or_404(Estoque, pk=pk)
-        serializer = EntradaSaidaSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            quantidade = serializer.validated_data['quantidade']
-            
-            # Verifica se há quantidade suficiente
-            if produto.quantidade < quantidade:
-                return Response({
-                    'error': 'Quantidade insuficiente em estoque',
-                    'quantidade_disponivel': produto.quantidade,
-                    'quantidade_solicitada': quantidade
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Atualiza o estoque
-            produto.quantidade -= quantidade
-            produto.save()
-            
-            # Cria registro no histórico
-            Historico.objects.create(
-                responsavel=request.user.usuario if hasattr(request.user, 'usuario') else Usuario.objects.first(),
-                produto=produto,
-                tipo_operacao='saida',
-                quantidade=quantidade
-            )
-            
-            return Response({
-                'message': 'Saída registrada com sucesso',
-                'produto': produto.tipo,
-                'quantidade_removida': quantidade,
-                'quantidade_atual': produto.quantidade
-            }, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            estoque = Estoque.objects.get(pk=pk)
+        except Estoque.DoesNotExist:
+            return Response({"erro": "Produto não encontrado"}, status=404)
 
+        quantidade = request.data.get("quantidade")
+
+        if quantidade is None:
+            return Response({"erro": "O campo 'quantidade' é obrigatório"}, status=400)
+
+        try:
+            quantidade = int(quantidade)
+        except:
+            return Response({"erro": "Quantidade inválida"}, status=400)
+
+        if quantidade <= 0:
+            return Response({"erro": "A quantidade deve ser maior que zero"}, status=400)
+
+        # Verifica se tem estoque suficiente
+        if quantidade > estoque.quantidade:
+            return Response(
+                {"erro": f"Estoque insuficiente! Estoque atual: {estoque.quantidade}"},
+                status=400
+            )
+
+        # Subtrai do estoque
+        estoque.quantidade -= quantidade
+        estoque.save()
+
+        return Response({
+            "mensagem": "Saída registrada com sucesso",
+            "id": estoque.id,
+            "novo_total": estoque.quantidade
+        }, status=200)
 
 # ==================== HISTORICO VIEWS ====================
 
 class HistoricoListView(ListAPIView):
     """
-    GET /api/historico/ - Lista todo o histórico
+    GET /api/historico/ - Lista todo o histórico (mais recente primeiro)
     Filtros disponíveis:
     - ?produto_id=1
     - ?tipo_operacao=entrada
@@ -166,6 +164,7 @@ class HistoricoListView(ListAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
+        # Busca com select_related para otimizar
         queryset = Historico.objects.select_related('responsavel', 'produto').all()
         
         # Filtro por produto
@@ -183,7 +182,8 @@ class HistoricoListView(ListAPIView):
         if responsavel_id:
             queryset = queryset.filter(responsavel_id=responsavel_id)
         
-        return queryset
+        # Ordena por mais recente primeiro
+        return queryset.order_by('-data_hora')
 
 
 class HistoricoDetailView(RetrieveAPIView):

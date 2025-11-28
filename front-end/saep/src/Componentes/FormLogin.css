@@ -1,0 +1,81 @@
+/* Centraliza o conteúdo com tamanho fixo */
+.login-container {
+    display: flex;
+    width: 900px;
+    height: 500px;
+    margin: 60px auto; /* Centraliza na página */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+}
+
+/* Imagem à esquerda */
+.image-section {
+    flex: 1;
+    background-color: #007BFF;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.image-section img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Formulário à direita */
+.form-section {
+    flex: 1;
+    padding: 40px;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.form-section h1 {
+    font-size: 28px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.form-section label {
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.form-section input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: none;
+    border-radius: 8px;
+    background-color: #e6e6e6;
+    font-size: 14px;
+}
+
+.form-section button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #cfe2ff;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    transition: background-color 0.3s;
+}
+
+.form-section button:hover {
+    background-color: #aacbfd;
+}
+
+.form-section .erro {
+    color: red;
+    margin-top: 10px;
+    text-align: center;
+}

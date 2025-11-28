@@ -1,15 +1,26 @@
-from .models import Usuarios,Estoque,Historico
+from .models import Usuario,Estoque,Historico
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
+class LoginSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['usuario'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'email': self.user.email,
+            'is_staff': self.user.is_staff,
+            'is_superuser': self.user.is_superuser,
+        }
+        return data
 
 
 
-class UsuariosSerializer(serializers.ModelSerializer):
+class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:  
-        model = Usuarios
+        model = Usuario
         fields = '__all__'
         extra_kwargs = {
             'password': {'write_only': True}
